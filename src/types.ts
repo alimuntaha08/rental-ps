@@ -23,6 +23,13 @@ export interface RentalHistory {
   hourlyRate: number;
 }
 
+export interface User {
+  id: string;
+  username: string;
+  password: string; // In a real app, this would be hashed
+  role: 'admin' | 'staff';
+}
+
 export interface Settings {
   rates: {
     PS3: number;

@@ -15,18 +15,27 @@ import {
   Trash2, 
   CheckCircle2,
   Gamepad2,
-  User,
+  User as UserIcon,
   DollarSign,
   TrendingUp,
   ChevronRight,
-  Download
+  Download,
+  LogOut,
+  Shield,
+  Lock,
+  Users
 } from 'lucide-react';
-import { format, differenceInMinutes, addMinutes, isAfter } from 'date-fns';
+import { format, differenceInMinutes, differenceInSeconds, addMinutes, isAfter } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { cn } from './lib/utils';
-import { Console, RentalHistory, Settings } from './types';
+import { Console, RentalHistory, Settings, User } from './types';
+
+const INITIAL_USERS: User[] = [
+  { id: '1', username: 'admin', password: 'admin123', role: 'admin' },
+  { id: '2', username: 'staff', password: 'staff123', role: 'staff' },
+];
 
 const DEFAULT_RATES = {
   PS3: 5000,
@@ -68,7 +77,29 @@ export default function App() {
     };
   });
 
+  const [users, setUsers] = useState<User[]>(() => {
+    const saved = localStorage.getItem('ps_users');
+    return saved ? JSON.parse(saved) : INITIAL_USERS;
+  });
+
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = sessionStorage.getItem('ps_current_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
   const [currentTime, setCurrentTime] = useState(Date.now());
+
+  useEffect(() => {
+    localStorage.setItem('ps_users', JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    if (currentUser) {
+      sessionStorage.setItem('ps_current_user', JSON.stringify(currentUser));
+    } else {
+      sessionStorage.removeItem('ps_current_user');
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
@@ -200,6 +231,20 @@ export default function App() {
     return { totalRevenue, totalSessions, activeConsoles };
   }, [history, consoles]);
 
+  const handleLogin = (username: string, password: string) => {
+    const user = users.find(u => u.username === username && u.password === password);
+    if (user) {
+      setCurrentUser(user);
+      return true;
+    }
+    return false;
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setActiveTab('dashboard');
+  };
+
   const exportToPDF = () => {
     const doc = new jsPDF();
     
@@ -238,6 +283,10 @@ export default function App() {
     doc.save(`Laporan_PS_Rental_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
   };
 
+  if (!currentUser) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#1A1A1A] font-sans">
       {/* Sidebar */}
@@ -273,11 +322,28 @@ export default function App() {
           />
         </nav>
 
-        <div className="p-6 border-t border-gray-100">
+        <div className="p-6 border-t border-gray-100 space-y-4">
           <div className="bg-indigo-50 rounded-2xl p-4">
-            <p className="text-xs font-semibold text-indigo-600 uppercase mb-1">Current Time</p>
-            <p className="text-lg font-bold text-indigo-900">{format(currentTime, 'HH:mm:ss')}</p>
-            <p className="text-xs text-indigo-400">{format(currentTime, 'EEEE, d MMM yyyy')}</p>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-indigo-600 shadow-sm">
+                {currentUser.role === 'admin' ? <Shield size={18} /> : <UserIcon size={18} />}
+              </div>
+              <div>
+                <p className="text-sm font-bold text-indigo-900 truncate">{currentUser.username}</p>
+                <p className="text-[10px] font-bold text-indigo-400 uppercase">{currentUser.role}</p>
+              </div>
+            </div>
+            <button 
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 py-2 bg-white text-red-500 rounded-xl text-xs font-bold shadow-sm hover:bg-red-50 transition-colors"
+            >
+              <LogOut size={14} />
+              Keluar
+            </button>
+          </div>
+          <div className="text-center">
+            <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Current Time</p>
+            <p className="text-sm font-bold text-gray-900">{format(currentTime, 'HH:mm:ss')}</p>
           </div>
         </div>
       </aside>
@@ -386,7 +452,7 @@ export default function App() {
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
-                                <User size={14} />
+                                <UserIcon size={14} />
                               </div>
                               <div>
                                 <p className="font-bold text-gray-900">{item.customerName}</p>
@@ -409,12 +475,14 @@ export default function App() {
                             <p className="font-bold text-emerald-600">Rp {item.totalCost.toLocaleString()}</p>
                           </td>
                           <td className="px-6 py-4 text-right">
-                            <button 
-                              onClick={() => setHistory(prev => prev.filter(h => h.id !== item.id))}
-                              className="text-gray-300 hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 size={18} />
-                            </button>
+                            {currentUser.role === 'admin' && (
+                              <button 
+                                onClick={() => setHistory(prev => prev.filter(h => h.id !== item.id))}
+                                className="text-gray-300 hover:text-red-500 transition-colors"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))
@@ -443,10 +511,11 @@ export default function App() {
                     <label className="text-xs font-bold text-gray-400 uppercase">Relay Base URL (IP Address)</label>
                     <input 
                       type="text" 
-                      value={settings.relayBaseUrl}
+                      value={settings.relayBaseUrl || ''}
+                      disabled={currentUser.role !== 'admin'}
                       onChange={(e) => setSettings(prev => ({ ...prev, relayBaseUrl: e.target.value }))}
                       placeholder="http://10.24.59.55"
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-mono text-sm"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-mono text-sm disabled:opacity-70"
                     />
                     <p className="text-[10px] text-gray-400 italic">Pastikan menyertakan http:// di depan alamat IP.</p>
                   </div>
@@ -466,12 +535,13 @@ export default function App() {
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">Rp</span>
                         <input 
                           type="number" 
-                          value={settings.rates[type]}
+                          value={settings.rates[type] || 0}
+                          disabled={currentUser.role !== 'admin'}
                           onChange={(e) => setSettings(prev => ({
                             ...prev,
                             rates: { ...prev.rates, [type]: parseInt(e.target.value) || 0 }
                           }))}
-                          className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-bold"
+                          className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-bold disabled:opacity-70"
                         />
                       </div>
                     </div>
@@ -485,24 +555,26 @@ export default function App() {
                     <Gamepad2 size={20} className="text-indigo-600" />
                     Daftar Console
                   </h3>
-                  <button 
-                    onClick={() => {
-                      const newId = (consoles.length + 1).toString();
-                      const newRelayId = consoles.length + 1;
-                      setConsoles(prev => [...prev, {
-                        id: newId,
-                        name: `Console ${newId.padStart(2, '0')}`,
-                        type: 'PS4',
-                        status: 'available',
-                        hourlyRate: settings.rates.PS4,
-                        relayId: newRelayId
-                      }]);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100"
-                  >
-                    <Plus size={16} />
-                    Tambah
-                  </button>
+                  {currentUser.role === 'admin' && (
+                    <button 
+                      onClick={() => {
+                        const newId = (consoles.length + 1).toString();
+                        const newRelayId = consoles.length + 1;
+                        setConsoles(prev => [...prev, {
+                          id: newId,
+                          name: `Console ${newId.padStart(2, '0')}`,
+                          type: 'PS4',
+                          status: 'available',
+                          hourlyRate: settings.rates.PS4,
+                          relayId: newRelayId
+                        }]);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100"
+                    >
+                      <Plus size={16} />
+                      Tambah
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-3">
                   {consoles.map(c => (
@@ -517,17 +589,19 @@ export default function App() {
                         </div>
                         <div>
                           <input 
-                            value={c.name}
+                            value={c.name || ''}
+                            disabled={currentUser.role !== 'admin'}
                             onChange={(e) => setConsoles(prev => prev.map(item => item.id === c.id ? { ...item, name: e.target.value } : item))}
-                            className="bg-transparent font-bold text-gray-900 focus:outline-none"
+                            className="bg-transparent font-bold text-gray-900 focus:outline-none disabled:opacity-70"
                           />
                           <select 
                             value={c.type}
+                            disabled={currentUser.role !== 'admin'}
                             onChange={(e) => {
                               const type = e.target.value as any;
                               setConsoles(prev => prev.map(item => item.id === c.id ? { ...item, type, hourlyRate: settings.rates[type] } : item));
                             }}
-                            className="block text-xs text-gray-400 bg-transparent focus:outline-none"
+                            className="block text-xs text-gray-400 bg-transparent focus:outline-none disabled:opacity-70"
                           >
                             <option value="PS3">PS3</option>
                             <option value="PS4">PS4</option>
@@ -540,22 +614,99 @@ export default function App() {
                           <label className="text-[10px] font-bold text-gray-400 uppercase">Relay ID</label>
                           <input 
                             type="number"
-                            value={c.relayId}
+                            value={c.relayId || 0}
+                            disabled={currentUser.role !== 'admin'}
                             onChange={(e) => setConsoles(prev => prev.map(item => item.id === c.id ? { ...item, relayId: parseInt(e.target.value) || 0 } : item))}
-                            className="w-12 bg-transparent text-right font-bold text-gray-900 focus:outline-none"
+                            className="w-12 bg-transparent text-right font-bold text-gray-900 focus:outline-none disabled:opacity-70"
                           />
                         </div>
-                        <button 
-                          onClick={() => setConsoles(prev => prev.filter(item => item.id !== c.id))}
-                          className="p-2 text-gray-300 hover:text-red-500 transition-colors"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        {currentUser.role === 'admin' && (
+                          <button 
+                            onClick={() => setConsoles(prev => prev.filter(item => item.id !== c.id))}
+                            className="p-2 text-gray-300 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
               </section>
+
+              {currentUser.role === 'admin' && (
+                <section className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <Users size={20} className="text-indigo-600" />
+                      Manajemen User
+                    </h3>
+                    <button 
+                      onClick={() => {
+                        const newId = Math.random().toString(36).substr(2, 9);
+                        setUsers(prev => [...prev, {
+                          id: newId,
+                          username: `user_${newId.substr(0, 4)}`,
+                          password: 'password123',
+                          role: 'staff'
+                        }]);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100"
+                    >
+                      <Plus size={16} />
+                      Tambah User
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {users.map(u => (
+                      <div key={u.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <div className="flex items-center gap-4">
+                          <div className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs",
+                            u.role === 'admin' ? "bg-purple-100 text-purple-600" : "bg-blue-100 text-blue-600"
+                          )}>
+                            {u.role === 'admin' ? <Shield size={18} /> : <UserIcon size={18} />}
+                          </div>
+                          <div>
+                            <input 
+                              value={u.username || ''}
+                              onChange={(e) => setUsers(prev => prev.map(item => item.id === u.id ? { ...item, username: e.target.value } : item))}
+                              className="bg-transparent font-bold text-gray-900 focus:outline-none"
+                            />
+                            <div className="flex items-center gap-2">
+                              <Lock size={10} className="text-gray-400" />
+                              <input 
+                                type="password"
+                                value={u.password || ''}
+                                onChange={(e) => setUsers(prev => prev.map(item => item.id === u.id ? { ...item, password: e.target.value } : item))}
+                                className="bg-transparent text-xs text-gray-400 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <select 
+                            value={u.role}
+                            onChange={(e) => setUsers(prev => prev.map(item => item.id === u.id ? { ...item, role: e.target.value as any } : item))}
+                            className="text-xs font-bold text-gray-500 bg-transparent focus:outline-none"
+                          >
+                            <option value="admin">Admin</option>
+                            <option value="staff">Staff</option>
+                          </select>
+                          {u.id !== currentUser.id && (
+                            <button 
+                              onClick={() => setUsers(prev => prev.filter(item => item.id !== u.id))}
+                              className="p-2 text-gray-300 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -566,7 +717,101 @@ export default function App() {
         <MobileNavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={20} />} />
         <MobileNavButton active={activeTab === 'history'} onClick={() => setActiveTab('history')} icon={<History size={20} />} />
         <MobileNavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<SettingsIcon size={20} />} />
+        <button 
+          onClick={handleLogout}
+          className="p-3 rounded-xl text-red-500"
+        >
+          <LogOut size={20} />
+        </button>
       </nav>
+    </div>
+  );
+}
+
+function Login({ onLogin }: { onLogin: (u: string, p: string) => boolean }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onLogin(username, password)) {
+      setError(false);
+    } else {
+      setError(true);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-6">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-md bg-white rounded-[2.5rem] p-10 shadow-xl shadow-indigo-100/50 border border-gray-100"
+      >
+        <div className="flex flex-col items-center mb-10">
+          <div className="w-16 h-16 bg-indigo-600 rounded-[1.5rem] flex items-center justify-center shadow-xl shadow-indigo-200 mb-6">
+            <Gamepad2 className="text-white" size={32} />
+          </div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">PS RENTAL</h1>
+          <p className="text-gray-400 font-medium mt-2">Silakan masuk untuk melanjutkan</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Username</label>
+            <div className="relative">
+              <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input 
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-bold"
+                placeholder="Masukkan username"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Password</label>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input 
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-bold"
+                placeholder="Masukkan password"
+                required
+              />
+            </div>
+          </div>
+
+          {error && (
+            <motion.p 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center text-sm font-bold text-red-500"
+            >
+              Username atau password salah!
+            </motion.p>
+          )}
+
+          <button 
+            type="submit"
+            className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:shadow-indigo-200 transition-all active:scale-[0.98]"
+          >
+            Masuk Sekarang
+          </button>
+        </form>
+
+        <div className="mt-10 pt-8 border-t border-gray-50 text-center">
+          <p className="text-xs text-gray-400 font-medium">
+            Lupa password? Hubungi Administrator.
+          </p>
+        </div>
+      </motion.div>
     </div>
   );
 }
@@ -583,25 +828,34 @@ function ConsoleCard({ console, onStart, onStop, currentTime }: ConsoleCardProps
   const [customerName, setCustomerName] = useState('');
   const [duration, setDuration] = useState<string>(''); // in minutes
 
+  const formatTime = (totalSeconds: number) => {
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
   const isPlaying = console.status === 'playing';
   
-  const elapsedMinutes = isPlaying && console.startTime 
-    ? differenceInMinutes(currentTime, console.startTime) 
+  const elapsedSeconds = isPlaying && console.startTime 
+    ? differenceInSeconds(currentTime, console.startTime) 
     : 0;
 
-  const remainingMinutes = isPlaying && console.startTime && console.durationMinutes
-    ? Math.max(0, console.durationMinutes - elapsedMinutes)
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+
+  const remainingSeconds = isPlaying && console.startTime && console.durationMinutes
+    ? Math.max(0, (console.durationMinutes * 60) - elapsedSeconds)
     : null;
 
   const progress = isPlaying && console.durationMinutes
-    ? Math.min(100, (elapsedMinutes / console.durationMinutes) * 100)
+    ? Math.min(100, (elapsedSeconds / (console.durationMinutes * 60)) * 100)
     : 0;
 
   const currentCost = isPlaying && console.startTime
     ? Math.ceil((Math.max(1, elapsedMinutes) / 60) * console.hourlyRate)
     : 0;
 
-  const isTimeUp = remainingMinutes !== null && remainingMinutes === 0;
+  const isTimeUp = remainingSeconds !== null && remainingSeconds === 0;
 
   return (
     <div className={cn(
@@ -626,7 +880,7 @@ function ConsoleCard({ console, onStart, onStop, currentTime }: ConsoleCardProps
         <h3 className="text-xl font-black text-gray-900 mb-1">{console.name}</h3>
         {isPlaying ? (
           <div className="flex items-center gap-2 text-gray-400">
-            <User size={14} />
+            <UserIcon size={14} />
             <span className="text-sm font-medium">{console.customerName}</span>
           </div>
         ) : (
@@ -639,18 +893,18 @@ function ConsoleCard({ console, onStart, onStop, currentTime }: ConsoleCardProps
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-[10px] font-bold text-gray-400 uppercase">Elapsed</p>
-              <p className="text-2xl font-black text-gray-900 tabular-nums">
-                {Math.floor(elapsedMinutes / 60)}h {elapsedMinutes % 60}m
+              <p className="text-xl font-black text-gray-900 tabular-nums">
+                {formatTime(elapsedSeconds)}
               </p>
             </div>
-            {remainingMinutes !== null && (
+            {remainingSeconds !== null && (
               <div className="text-right space-y-1">
                 <p className="text-[10px] font-bold text-gray-400 uppercase">Remaining</p>
                 <p className={cn(
-                  "text-2xl font-black tabular-nums",
+                  "text-xl font-black tabular-nums",
                   isTimeUp ? "text-red-600" : "text-indigo-600"
                 )}>
-                  {Math.floor(remainingMinutes / 60)}h {remainingMinutes % 60}m
+                  {formatTime(remainingSeconds)}
                 </p>
               </div>
             )}
@@ -685,7 +939,7 @@ function ConsoleCard({ console, onStart, onStop, currentTime }: ConsoleCardProps
         <div className="space-y-4">
           <div className="space-y-3">
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
               <input 
                 placeholder="Nama Customer"
                 value={customerName}
