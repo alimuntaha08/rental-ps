@@ -2,7 +2,7 @@ export interface Console {
   id: string;
   name: string;
   type: 'PS3' | 'PS4' | 'PS5';
-  status: 'available' | 'playing';
+  status: 'available' | 'playing' | 'finished';
   startTime?: number;
   endTime?: number;
   durationMinutes?: number; // if null, it's open-ended
@@ -19,8 +19,36 @@ export interface RentalHistory {
   startTime: number;
   endTime: number;
   totalDurationMinutes: number;
-  totalCost: number;
+  totalCost: number; // Rental only
+  fnbCost: number;
+  totalBill: number;
   hourlyRate: number;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  purchasePrice: number;
+  sellingPrice: number;
+  quantity: number;
+}
+
+export interface SaleItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  price: number;
+  total: number;
+}
+
+export interface Sale {
+  id: string;
+  items: SaleItem[];
+  totalAmount: number;
+  timestamp: number;
+  consoleId?: string; // Optional: link to a console session
+  customerName?: string;
+  isPaid?: boolean;
 }
 
 export interface User {

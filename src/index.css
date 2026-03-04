@@ -1,1 +1,23 @@
 @import "tailwindcss";
+
+@layer base {
+  @media print {
+    body * {
+      visibility: hidden;
+    }
+    #thermal-receipt, #thermal-receipt * {
+      visibility: visible;
+    }
+    #thermal-receipt {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 58mm;
+      display: block !important;
+    }
+    @page {
+      size: 58mm auto;
+      margin: 0;
+    }
+  }
+}
