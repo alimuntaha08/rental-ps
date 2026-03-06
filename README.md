@@ -1,14 +1,12 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
-
 Preview aplikasi:
 <img width="1365" height="767" alt="image" src="https://github.com/user-attachments/assets/0db4f3c4-adfc-465f-899e-c33d0465d7e8" />
+
 
 Point of Sale (POS):
 <img width="1342" height="611" alt="image" src="https://github.com/user-attachments/assets/637587d5-fbe2-4bca-b1d4-f49d710545db" />
 
-Master prodyk F&B:
+
+Master produk F&B:
 <img width="1339" height="604" alt="image" src="https://github.com/user-attachments/assets/fb1538b6-8ad6-446d-ac3a-26aeaef07769" />
 
 Laporan:
@@ -19,6 +17,7 @@ Pengaturan:
 <img width="1327" height="602" alt="image" src="https://github.com/user-attachments/assets/ce59d045-3218-4e90-8598-36a00c2b2c29" />
 
 Hardware:
+
 ![vmsgbr](https://github.com/user-attachments/assets/e35c5dc5-de8a-4233-9c6c-125324e35190)
 
 # Run and deploy your AI Studio app
